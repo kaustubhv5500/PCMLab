@@ -13,7 +13,7 @@ class Switch13(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(Switch13, self).__init__(*args, **kwargs)
-        # TODO 7. Create a sttructure to save the mac to port mappigs in every switch.
+        # TODO 7. Create a structure to save the mac to port mappigs in every switch.
         # A nested dictionary can be a convenient representation.
         # This is a example, the dictionary here should be empty.
         # Its contents will be pushed in the packet in handler.
@@ -25,7 +25,8 @@ class Switch13(app_manager.RyuApp):
         #     ...
         #  }
         # Replace the None
-        self.switch_mac_port_map = None
+        # Defining an empty dictionary to store the mac to port mappings for every switch individually
+        self.switch_mac_port_map = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -38,7 +39,11 @@ class Switch13(app_manager.RyuApp):
         # TODO 5. Replace the default action with one that instructs
         # the switch to send unknown traffic to the controller.
         # Add an argument to avoid buffering packets in the switch
-        actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+        # Replaced: actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+
+        # Setting the actions to forward the packet to the controller and not to buffer
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
@@ -76,46 +81,51 @@ class Switch13(app_manager.RyuApp):
 
         # TODO 6. Conplete the log message.
         # Replace the None with the respective variable.
+        # Added the variables from the datapath, packet and header values
         self.logger.info(
           "Packet in!. sw: s%s, port: %s, src mac: %s, dst mac: %s, ethertype: %s, length: %s"
-          , None, None, None, None, ethertype, ev.msg.msg_len)
+          , switch_dpid, switch_in_port, src_mac, dst_mac, ethertype, ev.msg.msg_len)
 
-        # # TODO 8. Learn the source MAC address in this switch.
-        # # Be carefull you don't forget previously learn stuff
-        # if not XXX in self.switch_mac_port_map:
-        #     # The first time you have to push the nested dict
-        #     # self.switch_mac_port_map[XXX] = {XXX: XXX}
-        # else:
-        #     # self.switch_mac_port_map[XXX][XXX] = XXX
-        # # You may wish to comment this for later when you are sure that the
-        # # learnig process is working good
-        # for mac_address, port_num in self.switch_mac_port_map[XXX].items():
-        #     self.logger.info("src mac: %s, is at port: %s of sw: s%s",
-        #         XXX, XXX, XXX)
+        # TODO 8. Learn the source MAC address in this switch.
+        # Be carefull you don't forget previously learnt stuff
+        if switch_dpid not in self.switch_mac_port_map:
+            # The first time you have to push the nested dict
+            # Set the switch id as an index to a nested dictionary which has the source mac
+            # as the index and the input port as the key
+            self.switch_mac_port_map[switch_dpid] = {src_mac: switch_in_port}
+        else:
+            self.switch_mac_port_map[switch_dpid][src_mac] = switch_in_port
+        # You may wish to comment this for later when you are sure that the
+        # learning process is working good
+        # Log the mac address and the input port from the filled dictionary
+        for mac_address, port_num in self.switch_mac_port_map[switch_dpid].items():
+            self.logger.info("mac: %s, is at port: %s of sw: s%s",
+                mac_address, port_num, switch_dpid)
 
-        # # TODO 9. Check if the switch knows how to reach the destination MAC address
-        # if XXX in self.switch_mac_port_map[XXX]:
-        #     switch_out_port = self.switch_mac_port_map[XXX][XXX]
-        # else:
-        #     # If the switch does not know what to do
-        #     # fallback to hub behavior
-        #     switch_out_port = XXX
-        # self.logger.info("dst mac: %s, is at port: %s of sw: s%s",
-        #     XXX, XXX, XXX)
+        # TODO 9. Check if the switch knows how to reach the destination MAC address
+        if dst_mac in self.switch_mac_port_map[switch_dpid]:
+            switch_out_port = self.switch_mac_port_map[switch_dpid][dst_mac]
+        else:
+            # If the switch does not know what to do
+            # fallback to hub behavior
+            # If no info is known about the output port, FLOOD to all ports
+            switch_out_port = ofproto.OFPP_FLOOD
+        self.logger.info("dst mac: %s, is at port: %s of sw: s%s",
+            dst_mac, switch_out_port, switch_dpid)
 
-        # # TODO 10. Let's forward the packet,
-        # # by telling the switch which port to use
-        # actions = [parser.OFPActionOutput(XXX)]
-        # out = parser.OFPPacketOut(datapath=XXX, buffer_id=ev.msg.buffer_id,
-        #     in_port=XXX, actions=XXX, data=ev.msg.data)
-        # datapath.send_msg(XXX)
+        # TODO 10. Let's forward the packet,
+        # by telling the switch which port to use
+        actions = [parser.OFPActionOutput(switch_out_port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ev.msg.buffer_id,
+            in_port=switch_in_port, actions=actions, data=ev.msg.data)
+        datapath.send_msg(out)
 
-        # # TODO 12. Adding flow rules.
-        # # Only install the flow when the destination port is known
-        # if switch_out_port != XXX:
-        #     match = parser.OFPMatch(
-        #         in_port=XXX, eth_dst=XXX, eth_src=XXX)
-        #     self.logger.info("Installing flow in switch: s%s", XXX)
-        #     self.logger.info("Match: pkts with in port: %s, src mac: %s and dst mac: %s -> Action: use out port: %s",
-        #         XXX, XXX, XXX, XXX)
-        #     self.add_flow(XXX, 1, XXX, XXX)
+        # TODO 12. Adding flow rules.
+        # Only install the flow when the destination port is known
+        if switch_out_port != ofproto.OFPP_FLOOD:
+            match = parser.OFPMatch(
+                in_port=switch_in_port, eth_dst=dst_mac, eth_src=src_mac)
+            self.logger.info("Installing flow in switch: s%s", switch_dpid)
+            self.logger.info("Match: pkts with in port: %s, src mac: %s and dst mac: %s -> Action: use out port: %s",
+                switch_in_port, src_mac, dst_mac, switch_out_port)
+            self.add_flow(datapath, 1, match, actions)
