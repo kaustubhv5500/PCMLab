@@ -1,0 +1,43 @@
+{
+    "hosts": {
+        "m_p1": {"ip": "10.0.0.1/24", "mac": "08:00:00:00:00:01"},
+        "m_p2": {"ip": "10.0.0.2/24", "mac": "08:00:00:00:00:02"},
+        "m_s1": {"ip": "10.0.0.3/24", "mac": "08:00:00:00:00:03"},
+        "m_s2": {"ip": "10.0.0.4/24", "mac": "08:00:00:00:00:04"},
+        "g_p1": {"ip": "10.0.0.5/24", "mac": "08:00:00:00:00:05"},
+        "g_p2": {"ip": "10.0.0.6/24", "mac": "08:00:00:00:00:06"},
+        "g_s1": {"ip": "10.0.0.7/24", "mac": "08:00:00:00:00:07"},
+        "g_s2": {"ip": "10.0.0.8/24", "mac": "08:00:00:00:00:08"}
+    },
+    "switches": {
+        "s1": {"device_id" : "1"},
+        "s2": {"device_id" : "2"},
+        "s3": {"device_id" : "3"},
+        "s4": {"device_id" : "4"},
+        "s5": {"device_id" : "5"},
+        "s6": {"device_id" : "6"},
+        "s7": {"device_id" : "7"},
+        "s8": {"device_id" : "8"},
+        "s9": {"device_id" : "9"}
+    },
+    "links": [
+        {"node1":"s1-eth1", "node2":"s2-eth1"},
+        {"node1":"s1-eth2", "node2":"s3-eth1"},
+        {"node1":"s1-eth3", "node2":"s7-eth1"},
+        {"node1":"s1-eth4", "node2":"s8-eth1"},
+        {"node1":"s1-eth5", "node2":"s9-eth1"},
+        {"node1":"s2-eth2", "node2":"m_p1-eth1"},
+        {"node1":"s2-eth3", "node2":"m_p2-eth1"},
+        {"node1":"s3-eth2","node2":"m_s1-eth1"},
+        {"node1":"s3-eth3","node2":"m_s2-eth1"},
+        {"node1":"s7-eth2","node2":"s4-eth1"},
+        {"node1":"s8-eth2","node2":"s4-eth2"},
+        {"node1":"s9-eth2","node2":"s4-eth3"},
+        {"node1":"s5-eth1","node2":"s4-eth4"},
+        {"node1":"s6-eth1","node2":"s4-eth5"},
+        {"node1":"s5-eth2","node2":"g_p1-eth1"},
+        {"node1":"s5-eth3","node2":"g_p2-eth1"},
+        {"node1":"s6-eth2","node2":"g_s1-eth1"},
+        {"node1":"s6-eth3","node2":"g_s2-eth1"}
+    ]
+}

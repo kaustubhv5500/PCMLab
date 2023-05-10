@@ -21,7 +21,7 @@ class SimplestSwitch13(app_manager.RyuApp):
         match = parser.OFPMatch()
 
         # TODO 8. install action to act as a hub
-        # actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD
+        # actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
         actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
 
         # TODO 14. Try other actions achieving a similar functionality
