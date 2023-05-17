@@ -81,10 +81,10 @@ class Switch13(app_manager.RyuApp):
         }
 
         # TODO 20. Shortest path for ICMP traffic
-        # self.core_edges_list = [(1, 7), (7, 1), (XXX), (XXX), (XXX), (XXX),
-        #                         (XXX), (XXX), (XXX), (XXX), (XXX), (XXX)]
-        # self.edge_cost_range = (1, 10)
-        # self.DEFAULT_EDGE_WEIGHT = 1
+        self.core_edges_list = [(1,7), (7,1), (1,8), (8,1), (1,9), (9,1),
+                                (4,7), (7,4), (8,4), (4,8), (9,4), (4,9)]
+        self.edge_cost_range = (1, 10)
+        self.DEFAULT_EDGE_WEIGHT = 1
 
         # TODO 29. Retrieving flow stats
         # self.stats_poller_thread = hub.spawn(self.poll_switch_load)
@@ -99,7 +99,7 @@ class Switch13(app_manager.RyuApp):
         self.logger.info(f"Switch s{dpid} detected")
 
         # TODO 5. Adding the switches and links
-        self.network.add_node(switch, type=self.SWITCH_TYPE, name=f"s{dpid}", dp=dp, tx_pkts=0, num_flows=0)
+        self.network.add_node(dpid, type=self.SWITCH_TYPE, name=f"s{dpid}", dp=dp, tx_pkts=0, num_flows=0)
 
         # TODO 6. Detecting the hosts: When a new switch is detected, set the default action as Controller
         ofproto = dp.ofproto
@@ -204,15 +204,15 @@ class Switch13(app_manager.RyuApp):
             return
 
         # TODO 17. Detecting ICMP traffic
-        # ip_header = XXX
-        # ip_proto = ip_header.proto
-        # if ip_proto == self.IP_ICMP:
-        #     self.ip_handler(dp=XXX, parser=XXX, proto=XXX, ip_header=XXX, ev=XXX)
+        ip_header = pkt_in.get_protocols(ipv4.ipv4)[0]
+        ip_proto = ip_header.proto
+        if ip_proto == self.IP_ICMP:
+            self.ip_handler(dp=dp, parser=parser, proto=self.IP_ICMP, ip_header=ip_header, ev=ev)
 
         # TODO 23. Detecting TCP traffic
-        # elif ip_proto == self.IP_TCP:
-        #     tcp_header = XXXX
-        #     self.tcp_handler(dp=XXX, parser=XXX, proto=XXX, ip_header=XXX, tcp_header=XXX, ev=XXX)
+        elif ip_proto == self.IP_TCP:
+            tcp_header = pkt_in.get_protocols(tcp.tcp)[0]
+            self.tcp_handler(dp=dp, parser=parser, proto=self.IP_TCP, ip_header=ip_header, tcp_header=tcp_header, ev=ev)
 
     def arp_handler(self, dp, parser,  proto, arp_header, ev):
         self.logger.info("ARP packet!")
@@ -225,154 +225,125 @@ class Switch13(app_manager.RyuApp):
         # Keep the body of the if statement only with the pass statement during TODO 10
         # Focus only in the else statement during TODO 10
         if accces_status:
-             pass  # Comment me in TODO 14
-        #
-        #     # TODO 14. Shortest path for ARP traffic
-        #     # Get the shortest path
-        #     shortest_path = self.path_handler(src_ip=XXX, dst_ip=XXX)
-        #
-        #     # TODO 15. Routing for ARP traffic
-        #     if shortest_path:
-        #         # Install the rule in every switch of the path
-        #         for index, link in enumerate(shortest_path):
-        #             src_sw, dst_sw = link
-        #             hop_dp = self.network.nodes[src_sw]['dp']
-        #             match = parser.OFPMatch(
-        #                 eth_type=proto,
-        #                 XXX=src_ip,
-        #                 XXX=dst_ip
-        #             )
-        #             out_port = self.network.get_edge_data(XXX)["src_port"]
-        #             actions = [XXX]
-        #             self.logger.info(f"DP: {hop_dp.id}, Match: [Eth. proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
-        #             self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=XXX, match=XXX, actions=XXX)
-        #
-        #             # TODO 16. Forwarding initial ARP packet
-        #             # Output the packet in the last switch of the path
-        #             if index == len(shortest_path) - 1:
-        #                 in_port = self.network.get_edge_data(XXX)["dst_port"]
-        #                 self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
-        #                 out = parser.OFPPacketOut(datapath=XXX, buffer_id=ev.msg.buffer_id, in_port=XXX, actions=XXX, data=ev.msg.data)
-        #                 hop_dp.send_msg(out)
+             # pass  # Comment in TODO 14
+            # TODO 14. Shortest path for ARP traffic
+            # Get the shortest path
+            shortest_path = self.path_handler(src_ip=src_ip, dst_ip=dst_ip)
+
+            # TODO 15. Routing for ARP traffic
+            if shortest_path:
+                # Install the rule in every switch of the path
+                for index, link in enumerate(shortest_path):
+                    src_sw, dst_sw = link
+                    hop_dp = self.network.nodes[src_sw]["dp"]
+                    match = parser.OFPMatch(eth_type=proto, arp_spa=src_ip, arp_tpa=dst_ip)
+                    out_port = self.network.get_edge_data(src_sw, dst_sw)["src_port"]
+                    actions = [parser.OFPActionOutput(out_port)]
+                    self.logger.info(f"DP: {hop_dp.id}, Match: [Eth. proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
+                    self.add_flow(dp=hop_dp, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=match, actions=actions)
+
+                    # TODO 16. Forwarding initial ARP packet
+                    # Output the packet in the last switch of the path
+                    if index == len(shortest_path) - 1:
+                        in_port = self.network.get_edge_data(src_sw, dst_sw)["dst_port"]
+                        self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
+                        out = parser.OFPPacketOut(datapath=hop_dp, buffer_id=ev.msg.buffer_id, in_port=in_port, actions=actions, data=ev.msg.data)
+                        hop_dp.send_msg(out)
         else:
-            match = parser.OFPMatch(
-                eth_type=proto,
-                ipv4_src=src_ip,
-                ipv4_dst=dst_ip
-            )
+            match = parser.OFPMatch(eth_type=proto, arp_spa=src_ip, arp_tpa=dst_ip)
+            # Drop the packet by performing no action on it
             actions = []
             self.logger.info(f"DP: {dp.id}, Match: [Eth. proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
-            self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.LOW_PRIORITY, match=match, actions=actions)
-        #     # TODO 11. Rule priority
-        #     # Comment previous call to add flow. Install the same rule with medium priority
-        #     self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=XXX, match=XXX, actions=XXX)
-        #     # TODO 12. Idle timeout
-        #     # Comment previous call to add flow. Install the same rule with an idle timeout
-        #     self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, XXX=self.IDLE_TIMEOUT)
-        #     # TODO 13. Hard timeout
-        #     # Comment previous call to add flow. Install the same rule replacing the  idle timeout with a hard timeout
-        #     self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, XXX=self.HARD_TIMEOUT)
+            # self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.LOW_PRIORITY, match=match, actions=actions)
+            # TODO 11. Rule priority
+            # Comment previous call to add flow. Install the same rule with medium priority
+            # self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions)
+            # TODO 12. Idle timeout
+            # Comment previous call to add flow. Install the same rule with an idle timeout
+            # self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, i_tout=self.IDLE_TIMEOUT)
+            # TODO 13. Hard timeout
+            # Comment previous call to add flow. Install the same rule replacing the  idle timeout with a hard timeout
+            self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, h_tout=self.HARD_TIMEOUT)
 
     def ip_handler(self, dp, parser, proto, ip_header, ev):
         self.logger.info("ICMP packet!")
 
         # TODO 18. ICMP network access
-        # src_ip = ip_header.src
-        # dst_ip = ip_header.dst
-        # access_status = self.access_handler(src_ip=XXX, dst_ip=XXX, proto=XXX)
+        src_ip = ip_header.src
+        dst_ip = ip_header.dst
+        access_status = self.access_handler(src_ip=src_ip, dst_ip=dst_ip, proto=proto)
 
         # TODO 19. Blocking ICMP traffic.
-        # if access_status:
-        #     # Keep the body of the if statement only with the pass statement during TODO 19
-        #     # Focus only in the else statement during TODO 19
-        #     pass  # Comment me in TODO 20
-        #     # TODO 20. Shortest path for ICMP traffic
-        #     shortest_path = self.path_handler(src_ip=XXX, dst_ip=XXX, weight_func=self.load_balancer)
-        #     # TODO 21. Routing for ICMP traffic
-        #     if shortest_path:
-        #         for index, link in enumerate(shortest_path):
-        #             src_sw, dst_sw = link
-        #             hop_dp = self.network.nodes[XXX]['dp']
-        #             match = parser.OFPMatch(
-        #                 eth_type=ether_types.ETH_TYPE_IP,
-        #                 XXX=proto,
-        #                 XXX=src_ip,
-        #                 XXX=dst_ip
-        #             )
-        #             out_port = self.network.get_edge_data(XXX)["src_port"]
-        #             actions = [XXX]
-        #             self.logger.info(f"DP: {hop_dp.id}, Match: [IP proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
-        #             self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=XXX, actions=XXX)
-        #
-        #             # TODO 22. Forwarding initial ICMP packet
-        #             if index == len(shortest_path) - 1:
-        #                  in_port = self.network.get_edge_data(XXX)["dst_port"]
-        #                  self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
-        #                  out = parser.OFPPacketOut(datapath=XXX, buffer_id=ev.msg.buffer_id, in_port=XXX, actions=XXX, data=ev.msg.data)
-        #                  hop_dp.send_msg(out)
-        # else:
-        #     match = parser.OFPMatch(
-        #         eth_type=ether_types.ETH_TYPE_IP,
-        #         XXX=proto,
-        #         XXX=src_ip,
-        #         XXX_dst=dst_ip
-        #     )
-        #     actions = [XXX]
-        #     self.logger.info(f"DP: {dp.id}, Match: [IP proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
-        #     self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=XXX, actions=XXX, h_tout=self.HARD_TIMEOUT)
+        if access_status:
+            # Keep the body of the if statement only with the pass statement during TODO 19
+            # Focus only in the else statement during TODO 19
+            # pass  # Comment me in TODO 20
+            # TODO 20. Shortest path for ICMP traffic
+            shortest_path = self.path_handler(src_ip=src_ip, dst_ip=dst_ip, weight_func=self.load_balancer)
+            # TODO 21. Routing for ICMP traffic
+            if shortest_path:
+                for index, link in enumerate(shortest_path):
+                    src_sw, dst_sw = link
+                    hop_dp = self.network.nodes[src_sw]['dp']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip)
+                    out_port = self.network.get_edge_data(src_sw, dst_sw)["src_port"]
+                    actions = [parser.OFPActionOutput(out_port)]
+                    self.logger.info(f"DP: {hop_dp.id}, Match: [IP proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
+                    self.add_flow(dp=hop_dp, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=match, actions=actions)
+
+                    # TODO 22. Forwarding initial ICMP packet
+                    if index == len(shortest_path) - 1:
+                         in_port = self.network.get_edge_data(src_sw, dst_sw)["dst_port"]
+                         self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
+                         out = parser.OFPPacketOut(datapath=hop_dp, buffer_id=ev.msg.buffer_id, in_port=in_port, actions=actions, data=ev.msg.data)
+                         hop_dp.send_msg(out)
+        else:
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip)
+            actions = []
+            self.logger.info(f"DP: {dp.id}, Match: [IP proto: {proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
+            self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, h_tout=self.HARD_TIMEOUT)
 
     def tcp_handler(self, dp, parser,  proto, ip_header, tcp_header, ev):
         self.logger.info("TCP packet!")
 
         # TODO 24. TCP network access
-        # src_ip = ip_header.src
-        # dst_ip = ip_header.dst
-        # src_port = tcp_header.src_port
-        # dst_port = tcp_header.dst_port
-        # tcp_proto = self.tcp_proto_selector(src_ip=XXX, src_port=XXX, dst_port=XXX)
-        # access_status = self.access_handler(src_ip=XXX, dst_ip=XXX, proto=XXX)
+        src_ip = ip_header.src
+        dst_ip = ip_header.dst
+        src_port = tcp_header.src_port
+        dst_port = tcp_header.dst_port
+        tcp_proto = self.tcp_proto_selector(src_ip=src_ip, src_port=src_port, dst_port=dst_port)
+        access_status = self.access_handler(src_ip=src_ip, dst_ip=dst_ip, proto=tcp_proto)
 
         # TODO 25.  Blocking TCP traffic
-        # if access_status:
-        #     pass # Comment me in TODO 26
-        #     # Keep the body of the if statement only with the pass statement during TODO 25
-        #     # Focus only in the else statement during TODO 25
-        #
-        #     # TODO 26. Shortest path for TCP traffic
-        #     shortest_path = self.path_handler(src_ip=XXX, dst_ip=XXX, weight_func=self.load_balancer)
-        #     # TODO 27. Routing for TCP traffic
-        #     for index, link in enumerate(shortest_path):
-        #         src_sw, dst_sw = link
-        #         hop_dp = self.network.nodes[XXX]['dp']
-        #         match = parser.OFPMatch(
-        #             eth_type=ether_types.ETH_TYPE_IP,
-        #             XXX=proto,
-        #             XXX=src_ip,
-        #             XXX=dst_ip,
-        #             XXX=dst_port
-        #         )
-        #         out_port = self.network.get_edge_data(XXX)["src_port"]
-        #         actions = [XXX]
-        #         self.logger.info(f"DP: {hop_dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
-        #         self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=XXX, actions=XXX)
-        #
+        if access_status:
+            # pass # Comment me in TODO 26
+            # Keep the body of the if statement only with the pass statement during TODO 25
+            # Focus only in the else statement during TODO 25
+
+            # TODO 26. Shortest path for TCP traffic
+            shortest_path = self.path_handler(src_ip=src_ip, dst_ip=dst_ip, weight_func=self.load_balancer)
+            # TODO 27. Routing for TCP traffic
+            for index, link in enumerate(shortest_path):
+                src_sw, dst_sw = link
+                hop_dp = self.network.nodes[src_sw]['dp']
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip,in_port=dst_port)
+                out_port = self.network.get_edge_data(src_sw, dst_sw)["src_port"]
+                actions = [parser.OFPActionOutput(out_port)]
+                self.logger.info(f"DP: {hop_dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
+                self.add_flow(dp=hop_dp, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=match, actions=actions)
+
         #         # TODO 28. Forwarding initial ICMP packet
         #         if index == len(shortest_path) - 1:
         #             in_port = self.network.get_edge_data(XXX)["dst_port"]
         #             self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
         #             out = parser.OFPPacketOut(datapath=XXX, buffer_id=ev.msg.buffer_id, in_port=XXX, actions=XXX, data=ev.msg.data)
         #             hop_dp.send_msg(out)
-        # else:
-        #     match = parser.OFPMatch(
-        #         eth_type=ether_types.ETH_TYPE_IP,
-        #         XXX=proto,
-        #         XXX=src_ip,
-        #         XXX=dst_ip,
-        #         XXX=dst_port
-        #     )
-        #     actions = []
-        #     self.logger.info(f"DP: {dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
-        #     self.add_flow(dp=XXX, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=XXX, actions=XXX, h_tout=self.HARD_TIMEOUT)
+        else:
+            match = parser.OFPMatch(
+                eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip, in_port=dst_port)
+            actions = []
+            self.logger.info(f"DP: {dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
+            self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, h_tout=self.HARD_TIMEOUT)
 
     def access_handler(self, src_ip, dst_ip, proto):
         if dst_ip in self.access_dict[src_ip]["hosts"] and proto in self.access_dict[src_ip]["protocols"]:
