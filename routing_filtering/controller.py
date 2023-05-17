@@ -87,9 +87,9 @@ class Switch13(app_manager.RyuApp):
         self.DEFAULT_EDGE_WEIGHT = 1
 
         # TODO 29. Retrieving flow stats
-        # self.stats_poller_thread = hub.spawn(self.poll_switch_load)
-        # self.NUM_FLOWS_SORT = "num_flows"
-        # self.TX_PKTS_SORT = "tx_pkts"
+        self.stats_poller_thread = hub.spawn(self.poll_switch_load)
+        self.NUM_FLOWS_SORT = "num_flows"
+        self.TX_PKTS_SORT = "tx_pkts"
 
     @set_ev_cls(topo_event.EventSwitchEnter, MAIN_DISPATCHER)
     def new_switch_handler(self, ev):
@@ -284,7 +284,7 @@ class Switch13(app_manager.RyuApp):
             if shortest_path:
                 for index, link in enumerate(shortest_path):
                     src_sw, dst_sw = link
-                    hop_dp = self.network.nodes[src_sw]['dp']
+                    hop_dp = self.network.nodes[src_sw]["dp"]
                     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip)
                     out_port = self.network.get_edge_data(src_sw, dst_sw)["src_port"]
                     actions = [parser.OFPActionOutput(out_port)]
@@ -325,22 +325,21 @@ class Switch13(app_manager.RyuApp):
             # TODO 27. Routing for TCP traffic
             for index, link in enumerate(shortest_path):
                 src_sw, dst_sw = link
-                hop_dp = self.network.nodes[src_sw]['dp']
-                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip,in_port=dst_port)
+                hop_dp = self.network.nodes[src_sw]["dp"]
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip, tcp_dst=dst_port)
                 out_port = self.network.get_edge_data(src_sw, dst_sw)["src_port"]
                 actions = [parser.OFPActionOutput(out_port)]
                 self.logger.info(f"DP: {hop_dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: {out_port}")
                 self.add_flow(dp=hop_dp, table=self.DEFAULT_TABLE, priority=self.HIGH_PRIORITY, match=match, actions=actions)
 
-        #         # TODO 28. Forwarding initial ICMP packet
-        #         if index == len(shortest_path) - 1:
-        #             in_port = self.network.get_edge_data(XXX)["dst_port"]
-        #             self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
-        #             out = parser.OFPPacketOut(datapath=XXX, buffer_id=ev.msg.buffer_id, in_port=XXX, actions=XXX, data=ev.msg.data)
-        #             hop_dp.send_msg(out)
+                # TODO 28. Forwarding initial ICMP packet
+                if index == len(shortest_path) - 1:
+                    in_port = self.network.get_edge_data(src_sw, dst_sw)["dst_port"]
+                    self.logger.info(f"Pkt-out DP: {hop_dp.id}, in-port: {in_port}, out-port: {out_port}")
+                    out = parser.OFPPacketOut(datapath=hop_dp, buffer_id=ev.msg.buffer_id, in_port=in_port, actions=actions, data=ev.msg.data)
+                    hop_dp.send_msg(out)
         else:
-            match = parser.OFPMatch(
-                eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip, in_port=dst_port)
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_proto=proto, ipv4_src=src_ip, ipv4_dst=dst_ip, tcp_dst=dst_port)
             actions = []
             self.logger.info(f"DP: {dp.id}, Match: [TCP proto: {tcp_proto} src IP: {src_ip} dst IP: {dst_ip}], Out port: [Block]")
             self.add_flow(dp=dp, table=self.DEFAULT_TABLE, priority=self.MEDIUM_PRIORITY, match=match, actions=actions, h_tout=self.HARD_TIMEOUT)
@@ -389,7 +388,8 @@ class Switch13(app_manager.RyuApp):
                     self.request_stats(data["dp"])
             # TODO 30. Retrieving packet stats
             # Change the sorting parameter to packets transmitted.
-            util_list = self.utilization_sorter(sort_parameter=self.NUM_FLOWS_SORT)
+            # util_list = self.utilization_sorter(sort_parameter=self.NUM_FLOWS_SORT)
+            util_list = self.utilization_sorter(sort_parameter=self.TX_PKTS_SORT)
             self.logger.info("Printing switch utilization information")
             for util_entry in util_list:
                 self.logger.info(f"Switch s{util_entry['dpid']} tx. packets: {util_entry['tx_pkts']} num. flows {util_entry['num_flows']}")
@@ -400,11 +400,11 @@ class Switch13(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         # TODO 29. Retrieving flow stats
-        # req = parser.OFPFlowStatsRequest(XXX)
-        # datapath.send_msg(req)
+        req = parser.OFPFlowStatsRequest(datapath)
+        datapath.send_msg(req)
         # TODO 30. Retrieving packet stats
-        # req = parser.OFPPortStatsRequest(XXX, 0, ofproto.OFPP_ANY)
-        # datapath.send_msg(req)
+        req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
+        datapath.send_msg(req)
 
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
@@ -412,20 +412,20 @@ class Switch13(app_manager.RyuApp):
         body = ev.msg.body
         dpid = ev.msg.datapath.id
         # TODO 29. Retrieving flow stats
-        # num_flows = XXX
-        # # self.logger.info(f"s{dpid} num. flows: {num_flows}") # Commented to reduce output
-        # self.network.nodes[XXX]["num_flows"] = XXX
+        num_flows = len(body)
+        # self.logger.info(f"s{dpid} num. flows: {num_flows}") # Commented to reduce output
+        self.network.nodes[dpid]["num_flows"] = num_flows
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
         body = ev.msg.body
         dpid = ev.msg.datapath.id
         # TODO 30. Retrieving packet stats
-        # tx_pkts = 0
-        # for port_stat in body:
-        #     tx_pkts += port_stat.XXX
-        # # self.logger.info(f"s{dpid} transmitted packets: {tx_pkts}") # commented to reduce output
-        # self.network.nodes[XXX]["tx_pkts"] = XXX
+        tx_pkts = 0
+        for port_stat in body:
+            tx_pkts += port_stat.tx_packets
+        self.logger.info(f"s{dpid} transmitted packets: {tx_pkts}") # commented to reduce output
+        self.network.nodes[dpid]["tx_pkts"] = tx_pkts
 
     def utilization_sorter(self, sort_parameter="tx_pkts"):
         util_list = []
