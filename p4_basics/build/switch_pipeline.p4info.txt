@@ -1,0 +1,44 @@
+pkg_info {
+  arch: "v1model"
+}
+tables {
+  preamble {
+    id: 46460945
+    name: "MyIngress.forward"
+    alias: "forward"
+  }
+  match_fields {
+    id: 1
+    name: "standard_metadata.ingress_port"
+    bitwidth: 9
+    match_type: EXACT
+  }
+  action_refs {
+    id: 21735938
+  }
+  action_refs {
+    id: 25652968
+  }
+  size: 1024
+}
+actions {
+  preamble {
+    id: 21735938
+    name: "MyIngress.set_egress_spec"
+    alias: "set_egress_spec"
+  }
+  params {
+    id: 1
+    name: "port"
+    bitwidth: 9
+  }
+}
+actions {
+  preamble {
+    id: 25652968
+    name: "MyIngress.drop"
+    alias: "drop"
+  }
+}
+type_info {
+}
