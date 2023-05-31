@@ -151,9 +151,9 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
             hdr.telemetry.enq_qdepth = standard_metadata.enq_qdepth;
             hdr.telemetry.deq_qdepth = standard_metadata.deq_qdepth;
             hdr.telemetry.deq_timedelta = standard_metadata.deq_timedelta;
-            // Correct length fields adding size of INT header
+            // Correct length fields adding size of INT header i.e. 21 bytes
             hdr.udp.length = hdr.udp.length + 21;
-            hdr.ipv4.totalLen = hdr.ipv4.totalLen + hdr.udp.length;
+            hdr.ipv4.totalLen = hdr.ipv4.totalLen + 21;
           }
         }
       }

@@ -1,4 +1,5 @@
 from scapy.all import sniff, BitField, UDP, bind_layers, Packet, Ether, IP, TCP
+from statistics import mean
 
 telemetry_port = 33333
 switch_timedelta = []
@@ -30,10 +31,13 @@ def process_pkt(pkt):
             deq_qdepth.append(pkt["Telemetry header"].deq_qdepth)
             deq_timedelta.append(pkt["Telemetry header"].deq_timedelta)
         else:
-            print(switch_timedelta)
-            print(enq_qdepth)
-            print(deq_qdepth)
-            print(deq_timedelta)
+            print("----------------------------------------")
+            print("Mean values of telemetry data:")
+            print(f"Timedelta: {mean(switch_timedelta)}")
+            print(f"Enq Depth: {mean(enq_qdepth)}")
+            print(f"Deq Depth: {mean(deq_qdepth)}")
+            print(f"Deq Timedelta: {mean(deq_timedelta)}")
+            print("----------------------------------------")
     else:
         print(pkt.summary())
 

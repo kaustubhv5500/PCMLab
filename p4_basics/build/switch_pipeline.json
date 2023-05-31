@@ -546,8 +546,8 @@
                         "value" : ["ipv4", "totalLen"]
                       },
                       "right" : {
-                        "type" : "field",
-                        "value" : ["udp", "length"]
+                        "type" : "hexstr",
+                        "value" : "0x0015"
                       }
                     }
                   },
@@ -563,7 +563,7 @@
             "filename" : "switch_pipeline.p4",
             "line" : 156,
             "column" : 12,
-            "source_fragment" : "hdr.ipv4.totalLen = hdr.ipv4.totalLen + hdr.udp.length"
+            "source_fragment" : "hdr.ipv4.totalLen = hdr.ipv4.totalLen + 21"
           }
         }
       ]
