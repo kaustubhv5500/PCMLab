@@ -1,0 +1,13 @@
+{
+  "target": "bmv2",
+  "p4info": "build/l3_forwarding.p4info.txt",
+  "bmv2_json": "build/l3_forwarding.json",
+  "table_entries": [
+      {
+          "table": "MyIngress.ipv4_exact",
+          "default_action": true,
+          "action_name": "MyIngress.drop",
+          "action_params": { }
+      }
+  ]
+}
