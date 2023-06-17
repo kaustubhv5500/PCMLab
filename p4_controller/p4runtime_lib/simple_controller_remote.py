@@ -56,7 +56,13 @@ class P4RuntimeController:
 
     def print_topology(self):
         # TODO 12. Checking the topology at the controller side
-        pass
+        self.logger(f"Host List: ")
+        for host in self.hosts.keys():
+            self.logger(host, "IP: ", self.hosts[host]['ip'], "MAC: ", self.hosts[host]['mac'])
+
+        self.logger(f"Links: ")
+        for link in self.links:
+            self.logger(link['node1'], '-->', link['node2'])
 
     def program_switch_p4runtime(self, sw_name, sw_dict):
         grpc_port = sw_dict['grpc_port']
@@ -95,55 +101,56 @@ class P4RuntimeController:
     def packet_in_action(self, sw_name, packet_in):
         self.logger("Switch %s packet in!" % sw_name)
         # TODO 13. Detecting ARP and IP
-        # pkt = Ether(packet_in.packet.payload)
-        # if XXX in XXX:
-        #     src_ip = XXX
-        #     dst_ip = XXX
-        #     src_host = self.find_host_by_addr(src_ip, 'ip')
-        #     dst_host = self.find_host_by_addr(dst_ip, 'ip')
-        #     self.logger(
-        #         f"ARP packet. Src. ip: {src_ip}, dst. ip: {dst_ip}, src. host: {src_host}, dst. host: {dst_host}")
+        # Set default action as send_to_ctrl in sw_config.json file to change the default settings of the switch
+        pkt = Ether(packet_in.packet.payload)
+        if 'ARP' in pkt:
+            src_ip = pkt['ARP'].psrc
+            dst_ip = pkt['ARP'].pdst
+            src_host = self.find_host_by_addr(src_ip, 'ip')
+            dst_host = self.find_host_by_addr(dst_ip, 'ip')
+            self.logger(
+                f"ARP packet. Src. ip: {src_ip}, dst. ip: {dst_ip}, src. host: {src_host}, dst. host: {dst_host}")
+            # TODO 14. Shortest path computation and deployment.
+            # Uncomment this line after TODO 14
+            self.install_bidirectional_flow(src_host, dst_host, src_ip, dst_ip, pkt)
+        elif 'IP' in pkt:
+            src_ip = pkt['IP'].src
+            dst_ip = pkt['IP'].dst
+            src_host = self.find_host_by_addr(src_ip, 'ip')
+            dst_host = self.find_host_by_addr(dst_ip, 'ip')
+            self.logger(
+                f"IP packet. Src. ip: {src_ip}, dst. ip: {dst_ip}, src. host: {src_host}, dst. host: {dst_host}")
         #     TODO 14. Shortest path computation and deployment.
         #     # Uncomment this line after TODO 14
-        #     self.install_bidirectional_flow(src_host, dst_host, src_ip, dst_ip, pkt)
-        # elif XXX in XXX:
-        #     src_ip = XXX
-        #     dst_ip = XXX
-        #     src_host = self.find_host_by_addr(src_ip, 'ip')
-        #     dst_host = self.find_host_by_addr(dst_ip, 'ip')
-        #     self.logger(
-        #         f"IP packet. Src. ip: {src_ip}, dst. ip: {dst_ip}, src. host: {src_host}, dst. host: {dst_host}")
-        #     TODO 14. Shortest path computation and deployment.
-        #     # Uncomment this line after TODO 14
-        #     self.install_bidirectional_flow(src_host, dst_host, src_ip, dst_ip, pkt)
-        # else:
-        #     return
+            self.install_bidirectional_flow(src_host, dst_host, src_ip, dst_ip, pkt)
+        else:
+            return
 
     def install_bidirectional_flow(self, src_host, dst_host, src_ip, dst_ip, pkt):
+        # TODO 14: Shortest path computation and deployment
         path = self.path_handler(src_host, dst_host)
-        # TODO 14. Shortest path computation and deployment
-        # path = self.path_handler(XXX, XXX)
-        # if path:
-        #     # go path ->
-        #     for index in range(XXX, XXX, XXX):
-        #         current_sw = path[XXX]
-        #         next_sw = path[XXX]
-        #         out_port = self.topology.get_edge_data(XXX, XXX)['anchors'][XXX].replace('eth', '')
-        #         self.install_ipv4_exact_rule(XXX, XXX, XXX, XXX)
-        #     # return path <-
-        #     for index in range(XXX, XXX, XXX):
-        #         current_sw = path[XXX]
-        #         next_sw = path[XXX]
-        #         out_port = self.topology.get_edge_data(XXX, XXX)['anchors'][XXX].replace('eth', '')
-        #         self.install_ipv4_exact_rule(XXX, XXX, XXX, XXX)
-        #     TODO 16.  Sending the first-packet in.
-        #     # Packet out in last switch
-        #     last_sw = path[XXX]
-        #     out_port = XXX
-        #     pkt_out = self.build_packet_out(XXX, XXX)
-        #     self.switches[XXX]['connection'].PacketOut(XXX)
-        # else:
-        #     self.logger("Skipping path deployment")
+        if path:
+            # go path -->
+            for index in range(1, len(path)-1, 1):
+                current_sw = path[index]
+                next_sw = path[index+1]
+                out_port = self.topology.get_edge_data(current_sw, next_sw)['anchors'][current_sw].replace('eth', '')
+                self.install_ipv4_exact_rule(current_sw, out_port, src_ip, dst_ip)
+            # return path <--
+            for index in range(len(path)-2, 0, -1):
+                current_sw = path[index]
+                next_sw = path[index-1]
+                out_port = self.topology.get_edge_data(current_sw, next_sw)['anchors'][current_sw].replace('eth', '')
+                self.install_ipv4_exact_rule(current_sw, out_port, dst_ip, src_ip)
+
+            # TODO 16:  Sending the first-packet in.
+            # Packet out in last switch
+            last_sw = path[-2]
+            out_port = self.topology.get_edge_data(last_sw, dst_host)['anchors'][last_sw].replace('eth', '')
+            pkt_out = self.build_packet_out(pkt, out_port)
+            self.switches[last_sw]['connection'].PacketOut(pkt_out)
+        else:
+            self.logger("Skipping path deployment")
 
     def path_handler(self, src_host, dst_host):
         if self.topology.has_node(src_host) and self.topology.has_node(dst_host):

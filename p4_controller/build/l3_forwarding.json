@@ -39,8 +39,15 @@
       ]
     },
     {
-      "name" : "ethernet_t",
+      "name" : "packet_out_t",
       "id" : 3,
+      "fields" : [
+        ["egress_port", 16, false]
+      ]
+    },
+    {
+      "name" : "ethernet_t",
+      "id" : 4,
       "fields" : [
         ["dstAddr", 48, false],
         ["srcAddr", 48, false],
@@ -49,7 +56,7 @@
     },
     {
       "name" : "arp_t",
-      "id" : 4,
+      "id" : 5,
       "fields" : [
         ["hw_type", 16, false],
         ["proto_type", 16, false],
@@ -64,7 +71,7 @@
     },
     {
       "name" : "ipv4_t",
-      "id" : 5,
+      "id" : 6,
       "fields" : [
         ["version", 4, false],
         ["ihl", 4, false],
@@ -104,22 +111,29 @@
       "pi_omit" : true
     },
     {
-      "name" : "ethernet",
+      "name" : "packet_out",
       "id" : 3,
+      "header_type" : "packet_out_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "ethernet",
+      "id" : 4,
       "header_type" : "ethernet_t",
       "metadata" : false,
       "pi_omit" : true
     },
     {
       "name" : "arp",
-      "id" : 4,
+      "id" : 5,
       "header_type" : "arp_t",
       "metadata" : false,
       "pi_omit" : true
     },
     {
       "name" : "ipv4",
-      "id" : 5,
+      "id" : 6,
       "header_type" : "ipv4_t",
       "metadata" : false,
       "pi_omit" : true
@@ -149,6 +163,55 @@
         {
           "name" : "start",
           "id" : 0,
+          "parser_ops" : [],
+          "transitions" : [
+            {
+              "type" : "hexstr",
+              "value" : "0x00ff",
+              "mask" : null,
+              "next_state" : "parse_packet_out"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : "parse_ethernet"
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["standard_metadata", "ingress_port"]
+            }
+          ]
+        },
+        {
+          "name" : "parse_packet_out",
+          "id" : 1,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "packet_out"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : "parse_ethernet"
+            }
+          ],
+          "transition_key" : []
+        },
+        {
+          "name" : "parse_ethernet",
+          "id" : 2,
           "parser_ops" : [
             {
               "parameters" : [
@@ -189,7 +252,7 @@
         },
         {
           "name" : "parse_arp",
-          "id" : 1,
+          "id" : 3,
           "parser_ops" : [
             {
               "parameters" : [
@@ -213,7 +276,7 @@
         },
         {
           "name" : "parse_ipv4",
-          "id" : 2,
+          "id" : 4,
           "parser_ops" : [
             {
               "parameters" : [
@@ -245,7 +308,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "l3_forwarding.p4",
-        "line" : 262,
+        "line" : 258,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -262,7 +325,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "l3_forwarding.p4",
-        "line" : 239,
+        "line" : 235,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },
@@ -338,7 +401,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 156,
+            "line" : 154,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -360,7 +423,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 156,
+            "line" : 154,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -391,7 +454,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 160,
+            "line" : 158,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -413,7 +476,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 165,
+            "line" : 163,
             "column" : 8,
             "source_fragment" : "hdr.packet_in.setValid()"
           }
@@ -427,14 +490,14 @@
             },
             {
               "type" : "hexstr",
-              "value" : "0x0000"
+              "value" : "0x00ff"
             }
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 166,
-            "column" : 8,
-            "source_fragment" : "standard_metadata.egress_spec = 0"
+            "line" : 13,
+            "column" : 25,
+            "source_fragment" : "255; ..."
           }
         },
         {
@@ -464,7 +527,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 167,
+            "line" : 165,
             "column" : 8,
             "source_fragment" : "hdr.packet_in.ingress_port = (bit<16>) standard_metadata.ingress_port"
           }
@@ -472,8 +535,72 @@
       ]
     },
     {
-      "name" : "l3_forwarding206",
+      "name" : "l3_forwarding195",
       "id" : 5,
+      "runtime_data" : [],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["standard_metadata", "egress_spec"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "&",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["packet_out", "egress_port"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0x01ff"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0x01ff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "l3_forwarding.p4",
+            "line" : 195,
+            "column" : 12,
+            "source_fragment" : "standard_metadata.egress_spec = (bit<9>) hdr.packet_out.egress_port"
+          }
+        },
+        {
+          "op" : "remove_header",
+          "parameters" : [
+            {
+              "type" : "header",
+              "value" : "packet_out"
+            }
+          ],
+          "source_info" : {
+            "filename" : "l3_forwarding.p4",
+            "line" : 196,
+            "column" : 12,
+            "source_fragment" : "hdr.packet_out.setInvalid()"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "l3_forwarding202",
+      "id" : 6,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -490,7 +617,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 206,
+            "line" : 202,
             "column" : 12,
             "source_fragment" : "meta.src_ipv4 = hdr.arp.sender_proto_addr"
           }
@@ -509,7 +636,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 207,
+            "line" : 203,
             "column" : 12,
             "source_fragment" : "meta.dst_ipv4 = hdr.arp.target_proto_addr"
           }
@@ -517,8 +644,8 @@
       ]
     },
     {
-      "name" : "l3_forwarding210",
-      "id" : 6,
+      "name" : "l3_forwarding206",
+      "id" : 7,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -535,7 +662,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 210,
+            "line" : 206,
             "column" : 12,
             "source_fragment" : "meta.src_ipv4 = hdr.ipv4.srcAddr"
           }
@@ -554,7 +681,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 211,
+            "line" : 207,
             "column" : 12,
             "source_fragment" : "meta.dst_ipv4 = hdr.ipv4.dstAddr"
           }
@@ -596,7 +723,7 @@
           ],
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 212,
+            "line" : 208,
             "column" : 12,
             "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
           }
@@ -610,18 +737,47 @@
       "id" : 0,
       "source_info" : {
         "filename" : "l3_forwarding.p4",
-        "line" : 150,
+        "line" : 148,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
       "init_table" : "node_2",
       "tables" : [
         {
-          "name" : "tbl_l3_forwarding206",
+          "name" : "tbl_l3_forwarding195",
           "id" : 0,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 206,
+            "line" : 195,
+            "column" : 42,
+            "source_fragment" : "= (bit<9>) hdr.packet_out.egress_port; ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [5],
+          "actions" : ["l3_forwarding195"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "l3_forwarding195" : null
+          },
+          "default_entry" : {
+            "action_id" : 5,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_l3_forwarding202",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "l3_forwarding.p4",
+            "line" : 202,
             "column" : 26,
             "source_fragment" : "= hdr.arp.sender_proto_addr; ..."
           },
@@ -632,14 +788,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [5],
-          "actions" : ["l3_forwarding206"],
+          "action_ids" : [6],
+          "actions" : ["l3_forwarding202"],
           "base_default_next" : "MyIngress.ipv4_exact",
           "next_tables" : {
-            "l3_forwarding206" : "MyIngress.ipv4_exact"
+            "l3_forwarding202" : "MyIngress.ipv4_exact"
           },
           "default_entry" : {
-            "action_id" : 5,
+            "action_id" : 6,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -647,10 +803,10 @@
         },
         {
           "name" : "MyIngress.ipv4_exact",
-          "id" : 1,
+          "id" : 2,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 172,
+            "line" : 170,
             "column" : 10,
             "source_fragment" : "ipv4_exact"
           },
@@ -691,11 +847,11 @@
           }
         },
         {
-          "name" : "tbl_l3_forwarding210",
-          "id" : 2,
+          "name" : "tbl_l3_forwarding206",
+          "id" : 3,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 210,
+            "line" : 206,
             "column" : 26,
             "source_fragment" : "= hdr.ipv4.srcAddr; ..."
           },
@@ -706,14 +862,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [6],
-          "actions" : ["l3_forwarding210"],
+          "action_ids" : [7],
+          "actions" : ["l3_forwarding206"],
           "base_default_next" : "MyIngress.ipv4_exact",
           "next_tables" : {
-            "l3_forwarding210" : "MyIngress.ipv4_exact"
+            "l3_forwarding206" : "MyIngress.ipv4_exact"
           },
           "default_entry" : {
-            "action_id" : 6,
+            "action_id" : 7,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -721,10 +877,10 @@
         },
         {
           "name" : "tbl_drop",
-          "id" : 3,
+          "id" : 4,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 215,
+            "line" : 211,
             "column" : 12,
             "source_fragment" : "drop()"
           },
@@ -756,8 +912,31 @@
           "id" : 0,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 205,
+            "line" : 194,
             "column" : 12,
+            "source_fragment" : "hdr.packet_out.isValid()"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "d2b",
+              "left" : null,
+              "right" : {
+                "type" : "field",
+                "value" : ["packet_out", "$valid$"]
+              }
+            }
+          },
+          "true_next" : "tbl_l3_forwarding195",
+          "false_next" : "node_4"
+        },
+        {
+          "name" : "node_4",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "l3_forwarding.p4",
+            "line" : 201,
+            "column" : 17,
             "source_fragment" : "hdr.arp.isValid()"
           },
           "expression" : {
@@ -771,15 +950,15 @@
               }
             }
           },
-          "true_next" : "tbl_l3_forwarding206",
-          "false_next" : "node_5"
+          "true_next" : "tbl_l3_forwarding202",
+          "false_next" : "node_7"
         },
         {
-          "name" : "node_5",
-          "id" : 1,
+          "name" : "node_7",
+          "id" : 2,
           "source_info" : {
             "filename" : "l3_forwarding.p4",
-            "line" : 209,
+            "line" : 205,
             "column" : 19,
             "source_fragment" : "hdr.ipv4.isValid()"
           },
@@ -794,7 +973,7 @@
               }
             }
           },
-          "true_next" : "tbl_l3_forwarding210",
+          "true_next" : "tbl_l3_forwarding206",
           "false_next" : "tbl_drop"
         }
       ]
@@ -804,7 +983,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "l3_forwarding.p4",
-        "line" : 225,
+        "line" : 221,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
@@ -820,7 +999,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "l3_forwarding.p4",
-        "line" : 239,
+        "line" : 235,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },

@@ -6,7 +6,7 @@
       {
           "table": "MyIngress.ipv4_exact",
           "default_action": true,
-          "action_name": "MyIngress.drop",
+          "action_name": "MyIngress.send_to_ctrl",
           "action_params": { }
       }
   ]

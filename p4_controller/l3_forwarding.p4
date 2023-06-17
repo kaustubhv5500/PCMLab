@@ -53,14 +53,14 @@ header packet_in_t {
   bit<16> ingress_port;
 }
 
-/*
+
 //TODO 15. Defining packet-out functionality.
 // Packet-out header, prepended to packets received from the controller
 @controller_header("packet_out")
 header packet_out_t {
-    bit<16>     egress_port;
+    bit<16> egress_port;
 }
-*/
+
 
 struct metadata {
 
@@ -75,7 +75,7 @@ struct headers {
     packet_in_t  packet_in;
 
     // TODO 15. Defining packet-out functionality.
-    // XXX packet_out;
+    packet_out_t packet_out;
 
     // TODO 3. Headers instantiation.
     ethernet_t ethernet;
@@ -96,20 +96,18 @@ parser MyParser(packet_in packet,
     state start {
         transition select(standard_metadata.ingress_port) {
             // TODO 15. Defining packet-out functionality.
-            /*XXX: XXX;*/
+            CTRL_PORT: parse_packet_out;
             // Change the default transition after TODO 4
             // TODO 4: Set default transition as parse_ethernet
             default: parse_ethernet;
         }
     }
 
-    /*
     // TODO 15. Defining packet-out functionality.
     state parse_packet_out {
-        packet.extract(XXX);
-        transition XXX;
+        packet.extract(hdr.packet_out);
+        transition parse_ethernet;
     }
-    */
 
 
     // TODO 4. Parser definition.
@@ -163,7 +161,7 @@ control MyIngress(inout headers hdr,
     // TODO 10. Defining packet-in functionality.
     action send_to_ctrl() {
         hdr.packet_in.setValid();
-        standard_metadata.egress_spec = 0;
+        standard_metadata.egress_spec = CTRL_PORT;
         hdr.packet_in.ingress_port = (bit<16>) standard_metadata.ingress_port;
     }
 
@@ -192,17 +190,15 @@ control MyIngress(inout headers hdr,
 
 
     apply {
-        /*
         // TODO 15. Defining packet-out functionality.
-        if (XXX) {
-            XXX = (XXX) XXX
-            XXX.setInvalid()
+        if (hdr.packet_out.isValid()) {
+            standard_metadata.egress_spec = (bit<9>) hdr.packet_out.egress_port;
+            hdr.packet_out.setInvalid();
         }
-        */
 
         // TODO 7. Using the table.
         // Change if to else if after TODO 15
-        if (hdr.arp.isValid()) {
+        else if (hdr.arp.isValid()) {
             meta.src_ipv4 = hdr.arp.sender_proto_addr;
             meta.dst_ipv4 = hdr.arp.target_proto_addr;
             ipv4_exact.apply();
